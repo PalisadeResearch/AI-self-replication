@@ -1,0 +1,41 @@
+repos:
+  - repo: local
+    hooks:
+      - id: nixfmt
+        name: nixfmt
+        entry: nixfmt
+        language: system
+        types: [nix]
+      - id: uv-lock
+        name: uv-lock
+        description: "Automatically run 'uv lock' on your project dependencies"
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH" && uv lock'
+        language: system
+        files: ^(uv\.lock|pyproject\.toml|uv\.toml)$
+        pass_filenames: false
+      - id: ruff
+        name: ruff
+        description: "Run 'ruff' for extremely fast Python linting"
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH" && ruff check --force-exclude'
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: ruff-format
+        name: ruff-format
+        description: "Run 'ruff format' for extremely fast Python formatting"
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH" && ruff format --force-exclude'
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: ty
+        name: ty
+        description: "Run 'ty' for Python type checking"
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH" && ty check'
+        language: system
+        types: [python]
+        require_serial: true
+        pass_filenames: false
+
+# pre-commit.ci SaaS does not have our Nix environment so we skip Nix-packaged hooks
+ci:
+  skip: [nixfmt, uv-lock, ruff, ruff-format, ty]

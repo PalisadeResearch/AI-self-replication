@@ -1,0 +1,29 @@
+[project]
+name = "ai-self-replication"
+version = "0.1.0"
+description = "Toolkit for AI self-replication experiments"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic-ai",
+    "logfire",
+    "langfuse>=3.14,<4.0",
+    "scikit-learn",
+    "matplotlib",
+    "numpy",
+    "openai",
+    "umap-learn",
+    "anthropic",
+    "python-dotenv",
+    "plotly",
+    "pandas",
+    "seaborn",
+    "b2",
+    "cartopy",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = false

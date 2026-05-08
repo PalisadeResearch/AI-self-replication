@@ -1,0 +1,9 @@
+.venv
+__pycache__
+.DS_Store
+.env
+.direnv/
+.ruff_cache/
+.ninja_log
+paper/rogue_replication.pdf
+paper/rogue_replication.dev.pdf

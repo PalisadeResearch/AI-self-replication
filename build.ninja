@@ -1,0 +1,173 @@
+# Build configuration for the AI self-replication paper.
+
+rule generate_milestone_tables
+  command = python3 paper/figures/scripts/generate_tables.py
+  description = Generating paper CSV tables
+  restat = 1
+
+rule generate_paper_plots
+  command = python3 paper/figures/scripts/generate_plots.py && svgo $out
+  description = Generating paper plot SVGs
+  restat = 1
+
+rule generate_prior_work_scatter
+  command = cd paper && python3 figures/scripts/generate_prior_work_scatter.py && svgo figures/prior_work_scatter.svg
+  description = Generating prior work scatter figure
+  restat = 1
+
+rule generate_discussion_scatter
+  command = cd paper && python3 figures/scripts/generate_discussion_scatter.py && svgo figures/discussion_scatter.svg
+  description = Generating discussion scatter figure
+  restat = 1
+
+rule generate_cap_over_time
+  command = cd paper && python3 figures/scripts/generate_cap_over_time.py && svgo figures/cap_over_time.svg
+  description = Generating capability over time figure
+  restat = 1
+
+rule generate_geo_chain
+  command = cd paper && python3 figures/scripts/generate_geo_chain.py && svgo figures/geo_chain_map.svg
+  description = Generating geo chain map figure
+  restat = 1
+
+rule generate_decomposition
+  command = cd paper && python3 figures/scripts/generate_decomposition.py && svgo figures/decomposition_self_replication.svg
+  description = Generating decomposition figure
+  restat = 1
+
+rule typst_compile
+  command = typst compile --ignore-system-fonts $typst_flags $main $out
+  description = Building $out with Typst
+
+build paper/figures/data/milestone_rates/gpt5.csv $
+    paper/figures/data/milestone_rates/gpt51.csv $
+    paper/figures/data/milestone_rates/gpt54.csv $
+    paper/figures/data/milestone_rates/opus4.csv $
+    paper/figures/data/milestone_rates/opus45.csv $
+    paper/figures/data/milestone_rates/opus46.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop1.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop2.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop3.csv $
+    paper/figures/data/milestone_rates/qwen35_35b.csv $
+    paper/figures/data/milestone_rates/qwen36_27b.csv $
+    paper/figures/data/milestone_rates/qwen36_35b.csv $
+    paper/figures/data/summary_tables/refusal_summary.csv: generate_milestone_tables paper/figures/scripts/generate_tables.py | $
+    docs/data/judge_results_api-gpt-5.json $
+    docs/data/judge_results_gen1.json $
+    docs/data/judge_results_gen2.json $
+    docs/data/judge_results_gen3.json $
+    docs/data/judge_results_gpt-5-1.json $
+    docs/data/judge_results_gpt54-new.json $
+    docs/data/judge_results_opus.json $
+    docs/data/judge_results_opus4.json $
+    docs/data/judge_results_opus45.json $
+    docs/data/judge_results_qwen-code.json $
+    docs/data/judge_results_qwen3.5-35b-gen-1.json $
+    docs/data/judge_results_qwen3.6-27b-gen1-vllm.json $
+    docs/data/responses_gen1_langfuse_full.json $
+    docs/data/responses_gen1_qwen3.6-27b-vllm.json $
+    docs/data/responses_gen3_mossgate_extra.json $
+    docs/data/responses_harness-qwen_qwen3.5-35b_apr-23.json $
+    docs/data/responses_p2_qwen-code.json $
+    docs/data/responses_p2_subtasks-v3_app-mossgate.json $
+    docs/data/responses_subtasks-v3_codex-115_gen2.json $
+    docs/data/responses_subtasks-v3_codex-115_gen3.json
+
+build paper/figures/model_comparison.svg $
+    paper/figures/gen_comparison.svg: generate_paper_plots $
+    paper/figures/scripts/generate_plots.py $
+    matplotlibrc $
+    paper/figures/scripts/generate_tables.py $
+    paper/figures/data/milestone_rates/gpt5.csv $
+    paper/figures/data/milestone_rates/gpt51.csv $
+    paper/figures/data/milestone_rates/gpt54.csv $
+    paper/figures/data/milestone_rates/opus4.csv $
+    paper/figures/data/milestone_rates/opus45.csv $
+    paper/figures/data/milestone_rates/opus46.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop1.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop2.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop3.csv $
+    paper/figures/data/milestone_rates/qwen35_35b.csv $
+    paper/figures/data/milestone_rates/qwen36_27b.csv $
+    paper/figures/data/milestone_rates/qwen36_35b.csv
+
+build paper/figures/prior_work_scatter.svg: generate_prior_work_scatter $
+    paper/figures/scripts/generate_prior_work_scatter.py $
+    matplotlibrc
+
+build paper/figures/discussion_scatter.svg: generate_discussion_scatter $
+    paper/figures/scripts/generate_discussion_scatter.py $
+    matplotlibrc
+
+build paper/figures/cap_over_time.svg: generate_cap_over_time $
+    paper/figures/scripts/generate_cap_over_time.py $
+    paper/figures/scripts/generate_tables.py $
+    matplotlibrc
+
+build paper/figures/geo_chain_map.svg: generate_geo_chain $
+    paper/figures/scripts/generate_geo_chain.py $
+    matplotlibrc
+
+build paper/figures/decomposition_self_replication.svg: generate_decomposition $
+    paper/figures/scripts/generate_decomposition.py $
+    matplotlibrc
+
+build paper/rogue_replication.pdf: typst_compile paper/rogue_replication.typ | $
+    paper/refs.bib $
+    paper/utils.typ $
+    paper/figures/cap_over_time.svg $
+    paper/figures/decomposition_self_replication.svg $
+    paper/figures/discussion_scatter.svg $
+    paper/figures/gen_comparison.svg $
+    paper/figures/geo_chain_map.svg $
+    paper/figures/geo_chain_topology.typ $
+    paper/figures/model_comparison.svg $
+    paper/figures/prior_work_scatter.svg $
+    paper/figures/data/milestone_rates/gpt5.csv $
+    paper/figures/data/milestone_rates/gpt51.csv $
+    paper/figures/data/milestone_rates/gpt54.csv $
+    paper/figures/data/milestone_rates/opus4.csv $
+    paper/figures/data/milestone_rates/opus45.csv $
+    paper/figures/data/milestone_rates/opus46.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop1.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop2.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop3.csv $
+    paper/figures/data/milestone_rates/qwen35_35b.csv $
+    paper/figures/data/milestone_rates/qwen36_27b.csv $
+    paper/figures/data/milestone_rates/qwen36_35b.csv $
+    paper/figures/data/summary_tables/refusal_summary.csv
+  main = paper/rogue_replication.typ
+  typst_flags = --input no-comments=true
+
+build paper/rogue_replication.dev.pdf: typst_compile paper/rogue_replication.typ | $
+    paper/refs.bib $
+    paper/utils.typ $
+    paper/figures/cap_over_time.svg $
+    paper/figures/decomposition_self_replication.svg $
+    paper/figures/discussion_scatter.svg $
+    paper/figures/gen_comparison.svg $
+    paper/figures/geo_chain_map.svg $
+    paper/figures/geo_chain_topology.typ $
+    paper/figures/model_comparison.svg $
+    paper/figures/prior_work_scatter.svg $
+    paper/figures/data/milestone_rates/gpt5.csv $
+    paper/figures/data/milestone_rates/gpt51.csv $
+    paper/figures/data/milestone_rates/gpt54.csv $
+    paper/figures/data/milestone_rates/opus4.csv $
+    paper/figures/data/milestone_rates/opus45.csv $
+    paper/figures/data/milestone_rates/opus46.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop1.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop2.csv $
+    paper/figures/data/milestone_rates/qwen122b_hop3.csv $
+    paper/figures/data/milestone_rates/qwen35_35b.csv $
+    paper/figures/data/milestone_rates/qwen36_27b.csv $
+    paper/figures/data/milestone_rates/qwen36_35b.csv $
+    paper/figures/data/summary_tables/refusal_summary.csv
+  main = paper/rogue_replication.typ
+  typst_flags =
+
+build paper-release: phony paper/rogue_replication.pdf
+build paper-dev: phony paper/rogue_replication.dev.pdf
+build paper: phony paper-dev
+
+default paper

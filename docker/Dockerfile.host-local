@@ -1,0 +1,123 @@
+# Replication-host: Codex CLI 0.115 + vLLM 0.17 + Responses->Chat proxy.
+# Used by Gen-1/2/3 runs in setup_experiment.sh for the host-1 container.
+# Build context: this Dockerfile + docker/*.{py,sh} helpers staged alongside.
+#
+# At runtime:
+#   - vLLM serves on 127.0.0.1:8001
+#   - responses_to_chat_proxy.py listens on 127.0.0.1:8000 and translates
+#     /v1/responses -> /v1/chat/completions so Codex 0.115 (wire_api="responses")
+#     can reach vLLM and vLLM's --tool-call-parser still applies to streaming.
+#
+# Container has no external network during runs; telemetry (Logfire/Langfuse)
+# is configured on the host and JSONL is uploaded post-run.
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+# Model to serve (override at build or run time).
+ARG MODEL=Qwen/Qwen3.5-122B-A10B-FP8
+ARG BACKEND=vllm
+ENV MODEL=${MODEL}
+ENV BACKEND=${BACKEND}
+
+ENV VLLM_WORKDIR=/opt/model-vllm
+ENV HOME=/home/agent
+ENV PATH="/home/agent/.local/bin:${PATH}"
+
+# System deps + CUDA 12.9 nvcc/cudart-dev for flashinfer JIT compilation
+# of Qwen3.5's GDN attention kernels.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    apt-transport-https \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    gnupg \
+    jq \
+    locales \
+    lsb-release \
+    nmap \
+    openssh-client \
+    sshpass \
+    pkg-config \
+    python3-dev \
+    python3-pip \
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
+    software-properties-common \
+    tmux \
+    unzip \
+    wget \
+    zstd \
+    && wget -qO /tmp/cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+       cuda-nvcc-12-9 \
+       cuda-cudart-dev-12-9 \
+    && rm -rf /var/lib/apt/lists/* \
+    && locale-gen en_US.UTF-8
+
+ENV CUDA_HOME=/usr/local/cuda-12.9
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+
+# Node.js LTS and Codex CLI 0.115.0 (requires wire_api="responses").
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g @openai/codex@0.115.0
+
+# Non-root user
+RUN useradd -m -s /bin/bash agent \
+    && mkdir -p "$VLLM_WORKDIR" /home/agent/.codex \
+    && chown -R agent:agent /opt/model-vllm /home/agent
+
+# uv + Python 3.12 venv + vLLM 0.17.0 (Qwen3.5 qwen3_5_moe architecture support).
+USER agent
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/agent/.local/bin:${PATH}"
+RUN uv python install 3.12
+
+WORKDIR "$VLLM_WORKDIR"
+RUN uv venv --python 3.12 --seed
+RUN . .venv/bin/activate && pip install --upgrade pip
+RUN . .venv/bin/activate \
+    && pip install --index-url https://download.pytorch.org/whl/cu128 \
+       torch==2.9.0+cu128 torchvision==0.24.0+cu128 torchaudio==2.9.0+cu128 \
+    && pip install 'vllm[flashinfer]==0.17.0' \
+    && pip check
+
+USER root
+
+# vLLM start script (launches vLLM on :8001, then proxy on :8000),
+# the proxy itself, chat-template patcher, and codex config writer.
+COPY start_vllm_with_proxy.sh /opt/model-vllm/start.sh
+COPY responses_to_chat_proxy.py /opt/model-vllm/responses_to_chat_proxy.py
+COPY patch_chat_template.py /opt/model-vllm/patch_chat_template.py
+COPY write_codex_config_replication.py /write_codex_config.py
+COPY entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /opt/model-vllm/start.sh /entrypoint.sh \
+    && chown agent:agent \
+       /opt/model-vllm/start.sh \
+       /opt/model-vllm/responses_to_chat_proxy.py \
+       /opt/model-vllm/patch_chat_template.py \
+       /write_codex_config.py \
+       /entrypoint.sh \
+    && mkdir -p /home/agent/models \
+    && chown agent:agent /home/agent/models
+
+# Run Codex with --json; JSONL is copied to host after run for Langfuse upload.
+COPY run_codex_local.sh /home/agent/run_codex_and_upload.sh
+RUN chmod +x /home/agent/run_codex_and_upload.sh \
+    && chown agent:agent /home/agent/run_codex_and_upload.sh
+
+# Default user root so docker exec (and chown of copied files) works without
+# -u root; HOME stays /home/agent for Codex/vLLM.
+USER root
+
+ENTRYPOINT ["/entrypoint.sh"]

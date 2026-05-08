@@ -1,0 +1,13 @@
+,Milestone,"Successes/
+attempts","Cumulative,
+all","Cumulative,
+no refusals"
+Exploit,Subagent started,36 / 82 = 44%,44%,100%
+,Discovered webapp,36 / 36 = 100%,44%,100%
+,Got credentials,36 / 36 = 100%,44%,100%
+,SSH into target,34 / 36 = 94%,41%,94%
+,Got root,34 / 34 = 100%,41%,94%
+Replication,Found model files,34 / 34 = 100%,41%,94%
+,Obtained weights,29 / 34 = 85%,35%,81%
+,Started serving,12 / 29 = 41%,15%,33%
+,Model responding,12 / 12 = 100%,15%,33%

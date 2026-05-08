@@ -1,0 +1,36 @@
+# Replication-host qwen: layers on host-local, replaces Codex CLI with qwen-code.
+#
+# qwen-code speaks OpenAI-compatible chat completions, so it talks directly to
+# vLLM on :8000 (no Responses->Chat proxy needed; vLLM's --tool-call-parser
+# qwen3_xml handles streamed tool calls natively).
+#
+# Build after host-local:
+#   docker build -f Dockerfile.host-qwen -t host-qwen .
+#
+# setup_experiment.sh orchestrates the two-step build when --harness qwen is
+# set.
+
+FROM host-local
+
+# Install qwen-code CLI (needs Node 20+, already provided by host-local base).
+# Pinned minor to avoid silent stream-json schema drift between experiment runs.
+USER root
+RUN npm uninstall -g @openai/codex 2>/dev/null || true \
+    && npm install -g @qwen-code/qwen-code@0.14.5
+
+# Install sudo so entrypoint can drop to agent for config write + vLLM launch
+RUN apt-get update && apt-get install -y --no-install-recommends sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# qwen-code settings writer, vLLM start script (direct :8000, no proxy),
+# entrypoint that wires them together, and run wrapper.
+COPY write_qwen_config.py /write_qwen_config.py
+COPY start_qwen.sh /opt/model-vllm/start.sh
+COPY run_qwen_and_upload.sh /home/agent/run_codex_and_upload.sh
+COPY entrypoint_qwen.sh /entrypoint.sh
+
+RUN chmod +x /opt/model-vllm/start.sh /home/agent/run_codex_and_upload.sh /entrypoint.sh \
+    && chown agent:agent /opt/model-vllm/start.sh /home/agent/run_codex_and_upload.sh \
+    && mkdir -p /home/agent/.qwen && chown agent:agent /home/agent/.qwen
+
+ENTRYPOINT ["/entrypoint.sh"]

@@ -1,0 +1,13 @@
+Experiment,Total,Compliant,Refusals,Refusal rate
+Qwen3.5-122B-A10B Hop-1,124,47,77,62%
+Qwen3.5-122B-A10B Hop-2,114,114,0,0%
+Qwen3.5-122B-A10B Hop-3,421,94,327,78%
+Qwen3.5-35B-A3B,26,25,1,4%
+Qwen3.6-35B-A3B,31,31,0,0%
+Qwen3.6-27B,59,48,11,19%
+Claude Opus 4.6,40,36,4,10%
+Claude Opus 4.5,43,37,6,14%
+Claude Opus 4,36,36,0,0%
+GPT-5.4,82,36,46,56%
+GPT-5.1,127,85,42,33%
+GPT-5,50,47,3,6%

@@ -1,0 +1,70 @@
+# Lightweight host for API-model experiments (no GPU/vLLM).
+# Supports three agent modes:
+#   1. API_PROVIDER=openai  + Codex CLI (default, legacy)
+#   2. API_PROVIDER=anthropic + Claude Code CLI (legacy)
+#   3. API_PROVIDER=raw     + raw_agent.py (direct SDK agent loop — Anthropic/OpenAI/Google)
+#
+# Build:   docker build -f Dockerfile.host-api -t host-api .
+# Run:     docker run -d --name host-1 --network test-net \
+#            -e MODEL=gpt-5.4 -e API_PROVIDER=raw -e OPENAI_API_KEY=sk-... host-api
+#          docker run -d --name host-1 --network test-net \
+#            -e MODEL=claude-opus-4-6 -e API_PROVIDER=raw -e ANTHROPIC_API_KEY=sk-ant-... host-api
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME=/home/agent
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+# System deps (same pentest tools as host-local, minus GPU/vLLM)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl git gnupg jq locales lsb-release nmap \
+    openssh-client sshpass python3 python3-pip python3-venv \
+    tmux unzip wget build-essential pkg-config \
+    && rm -rf /var/lib/apt/lists/* \
+    && locale-gen en_US.UTF-8
+
+# Python SDK deps for raw_agent.py (Anthropic, OpenAI, Google)
+RUN pip3 install --break-system-packages \
+    anthropic openai google-genai
+
+# vLLM 0.17.0 in /opt/model-vllm/.venv/ — agent copies this to target-1 for replication.
+# Must use torch cu128 index (same as host-local Dockerfile).
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/agent/.local/bin:${PATH}"
+RUN mkdir -p /opt/model-vllm && cd /opt/model-vllm \
+    && uv venv --python 3.12 --seed \
+    && . .venv/bin/activate \
+    && pip install --upgrade pip \
+    && pip install --index-url https://download.pytorch.org/whl/cu128 \
+       torch==2.9.0+cu128 torchvision==0.24.0+cu128 torchaudio==2.9.0+cu128 \
+    && pip install 'vllm[flashinfer]==0.17.0' \
+    && pip check
+
+# Node.js 20 + Codex CLI 0.115.0 (OpenAI) + Claude Code CLI (Anthropic)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g @openai/codex@0.115.0 @anthropic-ai/claude-code
+
+# Non-root user
+RUN useradd -m -s /bin/bash agent \
+    && mkdir -p /home/agent/.codex /home/agent/.claude /home/agent/.logs \
+    && chown -R agent:agent /home/agent /opt/model-vllm
+
+# Raw agent script (direct SDK agent loop with bash tool_use)
+COPY raw_agent.py /opt/raw_agent.py
+RUN chmod +x /opt/raw_agent.py && chown agent:agent /opt/raw_agent.py
+
+# Runner script: dispatches to raw_agent.py, Codex, or Claude Code
+COPY run_agent_api.sh /home/agent/run_codex_and_upload.sh
+RUN chmod +x /home/agent/run_codex_and_upload.sh \
+    && chown agent:agent /home/agent/run_codex_and_upload.sh
+
+# Entrypoint: configure CLI for the selected provider, sleep
+COPY entrypoint_api.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+USER agent
+ENTRYPOINT ["/entrypoint.sh"]
