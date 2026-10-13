@@ -19,6 +19,7 @@ Usage:
 import os
 import sys
 import json
+import math
 import argparse
 from datetime import datetime, timezone
 from typing import Any
@@ -37,8 +38,16 @@ def _to_ns(ts: Any) -> int | None:
     """Convert a timestamp (unix seconds float, RFC3339 str, or datetime) to ns int."""
     if ts is None:
         return None
+    if isinstance(ts, bool):
+        return None
     if isinstance(ts, (int, float)):
-        return int(ts * 1_000_000_000)
+        try:
+            value = ts * 1_000_000_000
+            if not math.isfinite(value):
+                return None
+            return int(value)
+        except (ValueError, OverflowError):
+            return None
     if isinstance(ts, datetime):
         return int(ts.timestamp() * 1_000_000_000)
     if isinstance(ts, str):
